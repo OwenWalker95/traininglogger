@@ -1,0 +1,26 @@
+.headers{
+    display: grid;
+    grid-template-columns: 200px repeat(auto-fit, minmax(10px, 1fr)); 
+    gap: 8px;
+    margin-bottom: 10px;
+    align-items: center;
+}
+
+.exercise-row{
+    display: grid;
+    grid-template-columns: 200px repeat(auto-fit, minmax(10px, 1fr)) ; 
+    gap: 8px;
+    margin-bottom: 10px;
+    align-items: center;
+}
+
+/*
+button.add-set,
+button.remove-set{
+    width: 10px;
+    height: 10px;
+    min-width: 10px;
+    max-width: 10px;
+    flex-shrink: 0;
+}
+*/
