@@ -37,8 +37,10 @@
         </div>    
         
         <button id="add-ex">add exercise</button>
-        <button id="remove-ex">remove exercise</button>        
+        <button id="remove-ex">remove exercise</button>  
         
+        <button id="save-session">Save Session</button>
+        <button id="debug">debug</button>
         
     </body>
     
@@ -90,13 +92,13 @@
             
             const weightInput = document.createElement('input');
             weightInput.type = 'number';
-            weightInput.className = 'weight';
+            weightInput.className = 'set-input';
             weightInput.placeholder = 'Weight';
             
 
             const repsInput = document.createElement('input');
             repsInput.type = 'number';
-            repsInput.className = 'reps';
+            repsInput.className = 'set-input';
             repsInput.placeholder = 'Reps';
         
         
@@ -151,7 +153,45 @@
             if (allRows.length > 1) {
             exercises.removeChild(allRows[allRows.length - 1]);
             }
-        });            
+        });
+
+        // Save Session
+        const saveButton = document.getElementById('save-session');
+        
+        saveButton.addEventListener('click', () => {
+            const jsonExercises = [];
+            
+            const allRows = exercises.querySelectorAll('.exercise-row');
+            for (let i = 0; i < allRows.length; i++){
+                const thisRow = allRows[i];
+                const thisEx = thisRow.querySelectorAll('.exercise-name');
+                const exName = thisEx[0].value;
+                const jsonSets = [];
+                
+                const allSets = thisRow.querySelectorAll('.set-input');
+                for (let i2 = 0; i2 < (allSets.length)/2; i2++){
+                    const weightVal = allSets[i2*2].value;
+                    const repsVal = allSets[(i2*2)+1].value;                    
+                    if (weightVal > 0 || repsVal > 0){
+                        jsonSets.push({weight:weightVal,reps:repsVal});
+                    }
+                }
+                
+                jsonExercises.push({exercise:exName, sets:jsonSets});
+            }
+            
+            localStorage.setItem("session", JSON.stringify(jsonExercises));         
+            location.reload();
+
+        });
+        
+        // output saved data
+        const debugButton = document.getElementById('debug');
+        debugButton.addEventListener('click', () => {
+            const data = JSON.parse(localStorage.getItem("session"));
+            console.log(data);
+        });
+           
     </script>
     
 </html>
