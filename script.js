@@ -112,8 +112,10 @@ removeExerciseBtn.addEventListener('click', () => {
 const saveButton = document.getElementById('save-session');
 
 saveButton.addEventListener('click', () => {
-    const jsonExercises = [];
+    const dateInput = document.getElementById('date-entry');
+    const theDate = dateInput.value;
     
+    const jsonExercises = [];    
     const allRows = exercises.querySelectorAll('.exercise-row');
     for (let i = 0; i < allRows.length; i++){
         const thisRow = allRows[i];
@@ -133,7 +135,9 @@ saveButton.addEventListener('click', () => {
         jsonExercises.push({exercise:exName, sets:jsonSets});
     }
     
-    localStorage.setItem("session", JSON.stringify(jsonExercises));         
+    const jsonSession = {date:theDate, exercises:jsonExercises}
+    
+    localStorage.setItem("session", JSON.stringify(jsonSession));         
     location.reload();
 
 });
