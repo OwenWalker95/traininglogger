@@ -109,6 +109,7 @@ removeExerciseBtn.addEventListener('click', () => {
 });
 
 // Save Session
+// needs validation to prevent blank dta
 const saveButton = document.getElementById('save-session');
 
 saveButton.addEventListener('click', () => {
@@ -137,8 +138,22 @@ saveButton.addEventListener('click', () => {
     
     const jsonSession = {date:theDate, exercises:jsonExercises}
     
-    localStorage.setItem("session", JSON.stringify(jsonSession));         
-    location.reload();
+    //localStorage.setItem("session", JSON.stringify(jsonSession));         
+    fetch('http://localhost:3000/save_session', {
+        method: 'POST',
+        headers: {
+            'Content-Type': 'application/json',
+        },
+        body: JSON.stringify(jsonSession),
+    })
+    .then(res => res.json())
+    .then(data => {
+        console.log('Success:', data);
+    })
+    .catch(err => {
+        console.error('Error:', err);
+    });
+    //location.reload();
 
 });
 
