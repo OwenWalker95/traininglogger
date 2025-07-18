@@ -153,7 +153,7 @@ saveButton.addEventListener('click', () => {
     .catch(err => {
         console.error('Error:', err);
     });
-    //location.reload();
+    location.reload();
 
 });
 
