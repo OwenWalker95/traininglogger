@@ -1,121 +1,113 @@
-const express = require('express');  // Import the express module
-const cors = require('cors');
+import express from 'express';
+import cors from 'cors';
+import sqlite3 from 'sqlite3';
+import { open } from 'sqlite';
+
 const app = express();              // Create an Express app
 const PORT = 3000;                  // Define the port to listen on
 
-// Opens connection to sqlite database - if file doesn't exist, create it
-const sqlite3 = require('sqlite3').verbose();
-const db = new sqlite3.Database('tracker.db');
+let db;
 
-// This creates table if it doesnt exist. currently each session is just text field
-db.run(`
-CREATE TABLE IF NOT EXISTS sessions (
-  id INTEGER PRIMARY KEY AUTOINCREMENT,
-  date TEXT
-);
-`); 
+// Set up database connection and ensure tables exist
+async function setupDatabase() {
+  db = await open({
+    filename: './workouts.db',
+    driver: sqlite3.Database
+  });
 
-db.run(`
-CREATE TABLE IF NOT EXISTS exercises (
-  id INTEGER PRIMARY KEY AUTOINCREMENT,
-  session_id INTEGER,
-  name TEXT,
-  FOREIGN KEY(session_id) REFERENCES workout_sessions(id)
-);
-`); 
+  await db.exec(`
+    CREATE TABLE IF NOT EXISTS sessions (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      date TEXT
+    );
+  `);
 
-db.run(`
-CREATE TABLE IF NOT EXISTS sets (
-  id INTEGER PRIMARY KEY AUTOINCREMENT,
-  exercise_id INTEGER,
-  weight INTEGER,
-  reps INTEGER,
-  FOREIGN KEY(exercise_id) REFERENCES exercises(id)
-);
-`); 
+  await db.exec(`
+    CREATE TABLE IF NOT EXISTS exercises (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      session_id INTEGER,
+      name TEXT,
+      FOREIGN KEY(session_id) REFERENCES sessions(id)
+    );
+  `);
 
-// Database functions
-async function save_wkout(db,sessionData){
-    // insert session high level data and get session ID
-    const sessionID = await insertSession(db,sessionData.date);
-    console.log(`SeshID:${sessionID}`);
-    
-    // insert each exercise using the sessionID
-    for (let i = 0; i < (sessionData.exercises.length); i++)
-    {
-        const exerciseID = await insertExercise(db, sessionID, sessionData.exercises[i].exercise);
-        console.log(`exID:${exerciseID}`);
-        // insert each set for this exercise using the exerciseID
-        for (let i2 = 0; i2 < sessionData.exercises[i].sets.length; i2++){
-            const weight = sessionData.exercises[i].sets[i2].weight;
-            const reps = sessionData.exercises[i].sets[i2].reps;
-            const setID = await insertSet(db, exerciseID, weight, reps);
-            console.log(`setID:${setID}`);
-        }
-    }
-    
+  await db.exec(`
+    CREATE TABLE IF NOT EXISTS sets (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      exercise_id INTEGER,
+      weight INTEGER,
+      reps INTEGER,
+      FOREIGN KEY(exercise_id) REFERENCES exercises(id)
+    );
+  `);
+
+  return db;
 }
 
-async function insertSession(db, date){    
-    return new Promise((resolve, reject) => {
-        db.run(`INSERT INTO sessions (date) VALUES (?)`, [date], function (err) {
-            if (err) return reject(err);
-            resolve(this.lastID); // 'this' contains metadata like lastID
-        });
-    });    
-}
+// Middleware
+app.use(express.json()); // automatically parse all incoming JSON
+app.use(cors()); // in production this would be restricted to the actual frontend only
 
-async function insertExercise(db, sessionID, name){
-    return new Promise((resolve, reject) => {
-        db.run(`INSERT INTO exercises (session_id, name) VALUES (?, ?)`, [sessionID, name], function (err){
-            if (err) return reject(err);
-            resolve(this.lastID);
-        });
-    });
-}
-
-async function insertSet(db, exerciseID, weight, reps){
-    return new Promise((resolve, reject) => {
-        db.run(`INSERT INTO sets (exercise_id, weight, reps) VALUES (?, ?, ?)`, [exerciseID, weight, reps],
-        function (err){
-            if (err) return reject(err);
-            resolve(this.lastID);
-        });
-    });
-}
-
-// Middleware to parse incoming JSON
-// automatically parse any JSON sent in the body of POST/PUT requests, and make it available on req.body.
-app.use(express.json());
-
-app.use(cors()); // allow all origins (in production would restrict to actual frontend domain)
-
-// Basic route to test server
+// Routes
 app.get('/ping', (req, res) => {
-    res.send('pong');  // Respond with 'pong' when /ping is requested
+  res.send('pong');
 });
 
+app.post('/save_session', async (req, res) => {
+  const sessionData = req.body;
+  try {
+    await saveWorkout(db, sessionData);
+    res.status(200).send('Session saved');
+  } catch (err) {
+    console.error('Failed to save session:', err);
+    res.status(500).send('Error saving session');
+  }
+});
 
-// Start the server
-app.listen(PORT, () => {
+app.get('/get_sessions', async (req, res) => {
+  try {
+    const sessions = await db.all('SELECT * FROM sessions');
+    res.json(sessions);
+  } catch (err) {
+    console.error(err);
+    res.status(500).send('Server error');
+  }
+});
+
+// Data saving logic
+async function saveWorkout(db, sessionData) {
+  const { date, exercises } = sessionData;
+
+  const result = await db.run(`INSERT INTO sessions (date) VALUES (?)`, [date]);
+  const sessionID = result.lastID;
+  console.log(`Saved session ID: ${sessionID}`);
+
+  for (const exercise of exercises) {
+    const exerciseResult = await db.run(
+      `INSERT INTO exercises (session_id, name) VALUES (?, ?)`,
+      [sessionID, exercise.exercise]
+    );
+    const exerciseID = exerciseResult.lastID;
+    console.log(`  Saved exercise ID: ${exerciseID}`);
+
+    for (const set of exercise.sets) {
+      const setResult = await db.run(
+        `INSERT INTO sets (exercise_id, weight, reps) VALUES (?, ?, ?)`,
+        [exerciseID, set.weight, set.reps]
+      );
+      console.log(`    Saved set ID: ${setResult.lastID}`);
+    }
+  }
+}
+
+// Start server
+setupDatabase().then(() => {
+  app.listen(PORT, () => {
     console.log(`Server is running at http://localhost:${PORT}`);
-});
+  });
 
-
-// Route to recieve saved session data
-app.post('/save_session', (req, res) => {
-    const sessionData = req.body; // This will contain the sent JSON
-//    const sessionString = JSON.stringify(sessionData);  // stringifying for now to store as one text field
-
-    console.log('Received workout data:', sessionData);
-
-    // Save to database 
-    save_wkout(db,sessionData);
-});
-
-
-// close DB on exit
-process.on('SIGINT', () => {
-  db.close();
-  process.exit();
+  process.on('SIGINT', () => {
+    db.close();
+    process.exit();
+  });
 });
